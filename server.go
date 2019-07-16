@@ -11,7 +11,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-var port = 8080
+var port = 80
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	log.Info(r.Method + ` ` + r.URL.String())
@@ -24,7 +24,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if file != nil {
 			defer file.Close()
 
-			filename := fmt.Sprintf("./uploads/%d", time.Now().Unix())
+			filename := fmt.Sprintf("./uploads/%d", time.Now().UnixNano())
 			f, _ := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
 			defer f.Close()
 			io.Copy(f, file)
@@ -36,7 +36,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
-	fmt.Fprintf(w, "OK")
+	fmt.Fprintf(w, "falcon.aws - OK")
 }
 
 func main() {
