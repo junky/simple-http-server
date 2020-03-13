@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -45,7 +46,8 @@ func main() {
 	//	http.HandleFunc("/", handler)
 
 	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/", fs)
+	fsWithGz := gziphandler.GzipHandler(fs)
+	http.Handle("/", fsWithGz)
 
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
