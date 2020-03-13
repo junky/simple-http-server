@@ -42,6 +42,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	log.Info(fmt.Sprintf("Server started. port: %d", port))
 
-	http.HandleFunc("/", handler)
+	//	http.HandleFunc("/", handler)
+
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/", fs)
+
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
