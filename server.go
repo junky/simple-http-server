@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/NYTimes/gziphandler"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
-var port = 80
+var port = 8080
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func postHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info(r.Method + ` ` + r.URL.String())
 	if r.Method == "POST" {
 		file, _, err := r.FormFile("data")
@@ -40,14 +41,41 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "falcon.aws - OK")
 }
 
+var chunks = []string{}
+
+func chunkHandler(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		panic("expected http.ResponseWriter to be an http.Flusher")
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	for _, s := range chunks {
+		log.Info(fmt.Sprintf("S: %s", s))
+		fmt.Fprint(w, s)
+		flusher.Flush() // Trigger "chunked" encoding and send a chunk...
+		time.Sleep(15000 * time.Millisecond)
+	}
+}
+
+func getChunks() []string {
+	buf, _ := ioutil.ReadFile("./static/001.full.html")
+	s := string(buf)
+	return strings.Split(s, "<!--chunk-->")
+}
+
 func main() {
 	log.Info(fmt.Sprintf("Server started. port: %d", port))
 
-	//	http.HandleFunc("/", handler)
+	chunks = getChunks()
+	http.HandleFunc("/", chunkHandler)
 
-	fs := http.FileServer(http.Dir("./static"))
-	fsWithGz := gziphandler.GzipHandler(fs)
-	http.Handle("/", fsWithGz)
+	//Handle gziped static content
+	/*
+		fs := http.FileServer(http.Dir("./static"))
+		fsWithGz := gziphandler.GzipHandler(fs)
+		http.Handle("/", fsWithGz)
+	*/
 
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
