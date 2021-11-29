@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -44,6 +46,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 var chunks = []string{}
 
 func chunkHandler(w http.ResponseWriter, r *http.Request) {
+	conn := GetConn(r)
+
+	log.Infof("RemoteAddr: %s", conn.RemoteAddr().String())
+	log.Infof("LocalAddr: %s", conn.LocalAddr().String())
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		panic("expected http.ResponseWriter to be an http.Flusher")
@@ -54,7 +61,7 @@ func chunkHandler(w http.ResponseWriter, r *http.Request) {
 		log.Info(fmt.Sprintf("S: %s", s))
 		fmt.Fprint(w, s)
 		flusher.Flush() // Trigger "chunked" encoding and send a chunk...
-		time.Sleep(15000 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -62,6 +69,19 @@ func getChunks() []string {
 	buf, _ := ioutil.ReadFile("./static/001.full.html")
 	s := string(buf)
 	return strings.Split(s, "<!--chunk-->")
+}
+
+type contextKey struct {
+	key string
+}
+
+var ConnContextKey = &contextKey{"http-conn"}
+
+func SaveConnInContext(ctx context.Context, c net.Conn) context.Context {
+	return context.WithValue(ctx, ConnContextKey, c)
+}
+func GetConn(r *http.Request) net.Conn {
+	return r.Context().Value(ConnContextKey).(net.Conn)
 }
 
 func main() {
@@ -77,5 +97,10 @@ func main() {
 		http.Handle("/", fsWithGz)
 	*/
 
-	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	//http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	server := http.Server{
+		Addr:        fmt.Sprintf(":%d", port),
+		ConnContext: SaveConnInContext,
+	}
+	server.ListenAndServe()
 }
