@@ -1,47 +1,18 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-var port = 8080
-
-func postHandler(w http.ResponseWriter, r *http.Request) {
-	log.Info(r.Method + ` ` + r.URL.String())
-	if r.Method == "POST" {
-		file, _, err := r.FormFile("data")
-		if err != nil {
-			log.Info(err.Error())
-		}
-
-		if file != nil {
-			defer file.Close()
-
-			filename := fmt.Sprintf("./uploads/%d", time.Now().UnixNano())
-			f, _ := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
-			defer f.Close()
-			io.Copy(f, file)
-
-		} else {
-			buf := new(bytes.Buffer)
-			buf.ReadFrom(r.Body)
-			log.Info(buf.String())
-		}
-
-	}
-	fmt.Fprintf(w, "falcon.aws - OK")
-}
+var port = 80
+var ServerId = "1"
 
 var chunks = []string{}
 
@@ -66,9 +37,10 @@ func chunkHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getChunks() []string {
-	buf, _ := ioutil.ReadFile("./static/001.full.html")
-	s := string(buf)
-	return strings.Split(s, "<!--chunk-->")
+	chunks := []string{}
+	chunks = append(chunks, "Hello, ServerId: "+ServerId+"!")
+	chunks = append(chunks, "<--! chunk -->")
+	return chunks
 }
 
 type contextKey struct {
@@ -85,19 +57,16 @@ func GetConn(r *http.Request) net.Conn {
 }
 
 func main() {
-	log.Info(fmt.Sprintf("Server started. port: %d", port))
+
+	EnvServerId := os.Getenv("SERVER_ID")
+	if EnvServerId != "" {
+		ServerId = EnvServerId
+	}
+	log.Info(fmt.Sprintf("Server started. port: %d, ServerId: %s", port, ServerId))
 
 	chunks = getChunks()
 	http.HandleFunc("/", chunkHandler)
 
-	//Handle gziped static content
-	/*
-		fs := http.FileServer(http.Dir("./static"))
-		fsWithGz := gziphandler.GzipHandler(fs)
-		http.Handle("/", fsWithGz)
-	*/
-
-	//http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	server := http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
 		ConnContext: SaveConnInContext,
